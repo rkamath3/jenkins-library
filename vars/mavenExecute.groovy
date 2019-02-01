@@ -20,6 +20,7 @@ import groovy.transform.Field
     'flags',
     'goals',
     'defines',
+    'isEvaluateExpression',
     'logSuccessfulMavenTransfers'
 ])
 
@@ -44,6 +45,7 @@ void call(Map parameters = [:]) {
         ], configuration)
 
         String command = "mvn"
+        def commandOptions = []
 
         def globalSettingsFile = configuration.globalSettingsFile
         if (globalSettingsFile?.trim()) {
@@ -51,12 +53,12 @@ void call(Map parameters = [:]) {
                 downloadSettingsFromUrl(globalSettingsFile)
                 globalSettingsFile = "settings.xml"
             }
-            command += " --global-settings '${globalSettingsFile}'"
+            commandOptions += "--global-settings '${globalSettingsFile}'"
         }
 
         def m2Path = configuration.m2Path
         if(m2Path?.trim()) {
-            command += " -Dmaven.repo.local='${m2Path}'"
+            commandOptions += "-Dmaven.repo.local='${m2Path}'"
         }
 
         def projectSettingsFile = configuration.projectSettingsFile
@@ -65,42 +67,48 @@ void call(Map parameters = [:]) {
                 downloadSettingsFromUrl(projectSettingsFile)
                 projectSettingsFile = "settings.xml"
             }
-            command += " --settings '${projectSettingsFile}'"
+            commandOptions += "--settings '${projectSettingsFile}'"
         }
 
         def pomPath = configuration.pomPath
         if(pomPath?.trim()){
-            command += " --file '${pomPath}'"
+            commandOptions += "--file '${pomPath}'"
         }
 
         def mavenFlags = configuration.flags
         if (mavenFlags?.trim()) {
-            command += " ${mavenFlags}"
+            commandOptions += "${mavenFlags}"
         }
 
         // Always use Maven's batch mode
-        if (!(command =~ /--batch-mode|-B(?=\s)|-B\\|-B$/)) {
-            command += ' --batch-mode'
+        if (!(commandOptions =~ /--batch-mode|-B(?=\s)|-B\\|-B$/)) {
+            commandOptions += '--batch-mode'
         }
 
         // Disable log for successful transfers by default. Note this requires the batch-mode flag.
-        final String disableSuccessfulMavenTransfersLogFlag = ' -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn'
+        final String disableSuccessfulMavenTransfersLogFlag = '-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn'
         if (!configuration.logSuccessfulMavenTransfers) {
             if (!command.contains(disableSuccessfulMavenTransfersLogFlag)) {
-                command += disableSuccessfulMavenTransfersLogFlag
+                commandOptions += disableSuccessfulMavenTransfersLogFlag
             }
         }
 
         def mavenGoals = configuration.goals
         if (mavenGoals?.trim()) {
-            command += " ${mavenGoals}"
+            commandOptions += "${mavenGoals}"
         }
         def defines = configuration.defines
         if (defines?.trim()){
-            command += " ${defines}"
+            commandOptions += "${defines}"
         }
-        dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
-            sh command
+        if(!configuration.isEvaluateExpression){
+          dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
+            sh "${command} ${commandOptions.join(\" \")}"
+          }
+        } else{
+           dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
+            body()
+          }  
         }
     }
 }
