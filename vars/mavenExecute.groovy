@@ -20,7 +20,7 @@ import groovy.transform.Field
     'flags',
     'goals',
     'defines',
-    'isEvaluateExpression',
+    'isCustomCommand',
     'logSuccessfulMavenTransfers'
 ])
 
@@ -101,15 +101,13 @@ void call(Map parameters = [:]) {
         if (defines?.trim()){
             commandOptions += "${defines}"
         }
-        if(!configuration.isEvaluateExpression){
-          dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
-            sh "${command} ${commandOptions.join(\" \")}"
-          }
-        } else{
-           dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
-            body()
-          }  
-        }
+        dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
+           if(!configuration.isCustomCommand)  
+                sh "${command} ${commandOptions.join(\" \")}"
+           } else {
+                body()
+           }
+        }  
     }
 }
 
